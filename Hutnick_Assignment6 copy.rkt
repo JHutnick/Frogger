@@ -1,0 +1,428 @@
+;; The first three lines of this file were inserted by DrRacket. They record metadata
+;; about the language level of this file in a form that our tools can easily process.
+#reader(lib "htdp-beginner-abbr-reader.ss" "lang")((modname |Hutnick_Assignment6 copy|) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #f #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp") (lib "batch-io.rkt" "teachpack" "2htdp")) #f)))
+;; Assignment6: Full Frogger Game
+
+
+;;CONSTANTS
+(define FROG-SIZE 40)
+(define ROAD (rectangle 800 60 'solid 'black ))
+(define ROADLINE (rectangle 800 10 'solid 'white))
+(define GROUND (rectangle 800 60 'solid 'brown))
+(define WATER (rectangle 800 60 'solid 'blue))
+(define JUMP 60)
+(define SPEED 3)
+(define CAR_WIDTH 30)
+(define CAR_HEIGHT 14)
+(define WIDTH 800)
+(define HEIGHT 780)
+(define GAME_OVER (overlay (text "You Lose" 70 'red) (rectangle 400 100 'solid 'white)))
+(define WIN (overlay (text "YOU WIN!" 70 'blue) (rectangle 400 100 'solid 'white)))
+
+(define BG
+  (place-image
+   GROUND 400 30
+   (place-image
+    WATER 400 90
+    (place-image
+     WATER 400 150
+     (place-image
+      WATER 400 210
+      (place-image
+       WATER 400 270
+       (place-image
+        WATER 400 330
+        (place-image
+         GROUND 400 390
+         (place-image
+          ROADLINE 400 420
+          (place-image
+           ROAD 400 450
+           (place-image
+            ROADLINE 400 480
+            (place-image
+             ROAD 400 510
+             (place-image
+              ROADLINE 400 540
+              (place-image
+               ROAD 400 570
+               (place-image
+                ROADLINE 400 600
+                (place-image
+                 ROAD 400 630
+                 (place-image
+                  ROADLINE 400 660
+                  (place-image
+                   ROAD 400 690
+                   (place-image
+                    ROADLINE 400 720
+                    (place-image
+                     GROUND 400 750
+                     (empty-scene WIDTH HEIGHT)))))))))))))))))))))
+
+(define FROG-IMG
+  (underlay/xy
+   (underlay/xy (triangle 40 'solid 'green)
+                10
+                15
+                (ellipse 10 10 'solid 'black))
+   20
+   15
+   (ellipse 10 10 'solid 'black)))
+
+(define PLANK-IMG (rectangle 50 25 'solid 'brown))
+(define TURTLE-IMG (circle 20 'solid 'brown))
+  
+(define CAR-IMG (above
+                 (rectangle CAR_WIDTH CAR_HEIGHT 'solid 'green)
+                 (underlay/align  "right" "bottom"
+                                  (underlay/align "left" "bottom"
+                                                  (rectangle 50 25 "solid" "blue")
+                                                  (circle  8 "solid" "yellow"))
+                                  (circle 8  "solid" "yellow"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;DATA DEFINITIONS
+
+;; A Player is a (make-player Integer Integer Direction)
+(define-struct player (x y dir))
+;; A Direction is one of "up", "down", "left", "right"
+
+;; A Vehicle is a (make-vehicle Integer Integer Direction)
+(define-struct vehicle (x y dir))
+;; A Direction is one of "up", "down", "left", "right"
+
+;; A plank is a (make-plank Integer Integer Direction)
+(define-struct plank (x y dir))
+;; A Direction is one of "up", "down", "left", "right"
+
+;; A turtle is a (make-turtle Integer Integer Direction)
+(define-struct turtle (x y dir))
+;; A Direction is one of "up", "down", "left", "right"
+
+;; A Set of Vehicles (VSet) is one of: 
+;; - empty
+;; - (cons Vehicle VSet)
+
+;; A Set of Planks (PSet) is one of: 
+;; - empty
+;; - (cons Plank PSet)
+
+;; A Set of Turtles (TSet) is one of: 
+;; - empty
+;; - (cons Turtle TSet)
+
+;; A World is a (make-world Player VSet)
+;;The VSet represents the set of vehicles moving across the screen
+(define-struct world (player vehicles planks turtles))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;TEMPLATES
+#|
+(define (world-temp w)
+    ...(world-player w) ... (world-vehicles w))
+
+(define (player-temp p)
+    ... (player-x p) ... (player-y p) ... (player-dir p))
+
+(define (vehicle-temp v)
+    ... (vehicle-x v) ... (vehicle-y v) ... (vehicle-dir v))
+
+(define (Vset-temp vset)
+    (cond [(empty? vset) ...]
+          [(cons? vset) ...(first vset)
+                     ...(vehicles-temp (rest vset))]))
+
+(define (dir-temp d)
+  (cond [(string=? d "up") ...]
+        [(string=? d "down") ...]
+        [(string=? d "left") ...]
+        [(string=? d "right") ...]))
+|#
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;;EXAMPLES
+
+(define player0 (make-player 400 750 "up"))
+
+(define Vset0
+  (list (make-vehicle 150 450 "left")
+        (make-vehicle 350 510 "right")
+        (make-vehicle 550 570 "left")
+        (make-vehicle 750 690 "right")))
+
+(define Vset1
+  (list (make-vehicle 150 450 "left")
+        (make-vehicle 150 510 "right")
+        (make-vehicle 150 570 "left")
+        (make-vehicle 150 630 "right")
+        (make-vehicle 150 690 "left")
+
+        (make-vehicle 350 450 "left")
+        (make-vehicle 350 510 "right")
+        (make-vehicle 350 570 "left")
+        (make-vehicle 350 630 "right")
+        (make-vehicle 350 690 "left")
+
+        (make-vehicle 550 450 "left")
+        (make-vehicle 550 510 "right")
+        (make-vehicle 550 570 "left")
+        (make-vehicle 550 630 "right")
+        (make-vehicle 550 690 "left")
+
+        (make-vehicle 750 450 "left")
+        (make-vehicle 750 510 "right")
+        (make-vehicle 750 570 "left")
+        (make-vehicle 750 630 "right")
+        (make-vehicle 750 690 "left")
+        ))
+
+(define Vset2 '())
+
+(define PSet0
+  (list (make-plank 150 150"right")
+        (make-plank 150 270 "right")
+        (make-plank 350 150 "right")
+        (make-plank 350 270 "right")
+        (make-plank 550 150"right")
+        (make-plank 550 270 "right")
+        (make-plank 750 150 "right")
+        (make-plank 750 270 "right")))
+
+(define TSet0
+  (list (make-plank 150 90 "left")
+        (make-plank 150 210 "left")
+        (make-plank 350 90 "left")
+        (make-plank 350 210 "left")
+        (make-plank 550 90 "left")
+        (make-plank 550 210 "left")
+        (make-plank 750 90 "left")
+        (make-plank 750 210 "left")))
+
+(define world0 (make-world player0 Vset0 PSet0 TSet0))
+(define world1 (make-world player0 Vset1 PSet0 TSet0))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; World -> World
+;; launches the frogger game
+(define (main w)
+  (big-bang w
+            [to-draw draw-world]
+            [on-tick move-world]
+            [on-key change-dir]
+            [stop-when collision? end-message]))
+            
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; RENDERING
+
+;; draw-world: World -> Image
+;; draw the given world onto the background
+(check-expect
+ (draw-world world0)
+ (place-image FROG-IMG 400 750
+              (place-image CAR-IMG 150 450
+                           (place-image CAR-IMG 350 510
+                                        (place-image CAR-IMG 550 570
+                                                     (place-image CAR-IMG 750 690 BG))))))
+
+(define (draw-world w)
+  (draw-player (world-player w) (draw-car (world-vehicles w)) (draw-plank (world-planks w)) (draw-turtle (world-turtles w))))
+
+;; draw-player: Player Image -> Image
+;; draw a player image onto the given image at the player's position
+(check-expect (draw-player player0 BG BG BG)
+              (place-image FROG-IMG 400 750))
+
+(define (draw-player p img img1 img2)
+  (place-image FROG-IMG (player-x p) (player-y p) img img1 img2))
+
+;; draw-car: Vset -> Image
+;; draws the vehicle onto the BG
+(check-expect (draw-car Vset2) BG)
+(check-expect (draw-car Vset0)
+              (place-image CAR-IMG 150 450
+                           (place-image CAR-IMG 350 510
+                                        (place-image CAR-IMG 550 570
+                                                     (place-image CAR-IMG 750 690 BG)))))
+
+(define (draw-car vset)
+  (cond [(empty? vset) BG]
+        [(cons? vset)
+         (place-image CAR-IMG (vehicle-x (first vset)) (vehicle-y (first vset))
+                      (draw-car (rest vset)))]))
+
+;; draw-car: Pset -> Image
+;; draws the plank onto the BG
+(define (draw-plank pset)
+  (cond [(empty? pset) BG]
+        [(cons? pset)
+         (place-image PLANK-IMG (plank-x (first pset)) (plank-y (first pset))
+                      (draw-plank (rest pset)))]))
+
+;; draw-car: Pset -> Image
+;; draws the plank onto the BG
+(define (draw-turtle tset)
+  (cond [(empty? tset) BG]
+        [(cons? tset)
+         (place-image TURTLE-IMG (turtle-x (first tset)) (turtle-y (first tset))
+                      (draw-turtle (rest tset)))]))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; MOVING
+
+;; move-world: World -> World
+;; moves the vehicles at each tick
+(check-expect (move-world world0)
+               (make-world (make-player 400 750 "up")
+                          (list
+                           (make-vehicle 147 450 "left")
+                           (make-vehicle 353 510 "right")
+                           (make-vehicle 547 570 "left")
+                           (make-vehicle -47 690 "right"))))
+
+(define (move-world w)
+  (make-world (world-player w) (move-all (world-vehicles w))))
+
+;; move-cars: Vset -> Vset
+;; moves the vehicle across the world
+(check-expect (move-all Vset2) '())
+(check-expect (move-all Vset0) (list
+                                (make-vehicle 147 450 "left")
+                                (make-vehicle 353 510 "right")
+                                (make-vehicle 547 570 "left")
+                                (make-vehicle -47 690 "right")))
+
+(define (move-all vset)
+  (cond [(empty? vset) '()]
+        [else
+         (cons (move (first vset))
+               (move-all (rest vset)))]))
+
+;; which-cars: Vehicle -> Vehicle
+;; check the direction of the vehicle
+(check-expect (move (make-vehicle 150 150 "left")) (make-vehicle 147 150 "left"))
+(check-expect (move (make-vehicle 350 250 "right")) (make-vehicle 353 250 "right"))
+(check-expect (move (make-vehicle 350 250 "up")) (make-vehicle 350 250 "up"))
+
+(define (move d)
+  (cond
+    [(string=?  (vehicle-dir d) "left") (check-left? d)]
+    [(string=? (vehicle-dir d) "right") (check-right? d)]
+    [else d]))
+
+;; check-left?: Vehicle -> Vehicle
+;; move the vehicle in the left direction
+(check-expect (check-left? (make-vehicle 150 150 "left")) (make-vehicle 147 150 "left"))
+(check-expect (check-left? (make-vehicle -1 150 "left")) (make-vehicle 796 150 "left"))
+
+(define (check-left? l)
+  (if (< (- (vehicle-x l) 2) 0)
+      (make-vehicle (+ (- (vehicle-x l) SPEED) WIDTH)  (vehicle-y l)(vehicle-dir l))
+      (make-vehicle (- (vehicle-x l) SPEED) (vehicle-y l)(vehicle-dir l))))
+
+;; check-right?: Vehicle -> Vehicle
+;; move the vehicle in the right direction
+(check-expect (check-right? (make-vehicle 350 250 "right")) (make-vehicle 353 250 "right"))
+(check-expect (check-right? (make-vehicle 701 250 "right")) (make-vehicle 704 250 "right"))
+
+(define (check-right? l)
+  (if (> (- (vehicle-x l) 2) 700)
+      (make-vehicle (- (+ (vehicle-x l) SPEED) WIDTH)  (vehicle-y l)(vehicle-dir l))
+      (make-vehicle (+ (vehicle-x l) SPEED) (vehicle-y l)(vehicle-dir l))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; KEY-HANDLER
+
+;; change-dir: World KeyEvent -> World
+;; change the player's direction within the boundry 
+(check-expect (change-dir world0 "up")
+              (make-world (make-player 400 690 "up") Vset0))
+(check-expect (change-dir (make-world (make-player 30 370 "up") Vset0) "down")
+              (make-world (make-player 30 430 "down") Vset0))
+(check-expect (change-dir world0 "left")
+              (make-world (make-player 340 750 "left") Vset0))
+(check-expect (change-dir world0 "right")
+              (make-world (make-player 460 750 "right") Vset0))
+(check-expect (change-dir (make-world (make-player 400 300 "right") Vset0) "space")
+              (make-world (make-player 400 300 "right") Vset0))
+              
+            
+(define (change-dir w k)
+  (cond
+    [(string=? k "up")
+     (make-world
+      (make-player (player-x (world-player w)) (- (player-y (world-player w)) JUMP) k)
+      (world-vehicles w))]
+    [(string=? k "down")
+     (make-world
+      (make-player (player-x (world-player w)) (+ (player-y (world-player w)) JUMP) k)
+      (world-vehicles w))] 
+    [(string=? k "left")
+     (make-world
+      (make-player (- (player-x (world-player w)) JUMP) (player-y (world-player w)) k)
+      (world-vehicles w))]
+    [(string=? k "right")
+     (make-world
+      (make-player (+ (player-x (world-player w)) JUMP) (player-y (world-player w)) k)
+      (world-vehicles w))]
+    [else w]))
+       
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; COLLISION
+
+;; collision? : World -> Boolean
+;; determines if the game is over if a collision occurs
+(check-expect (collision? world0) #false)
+(check-expect (collision? (make-world (make-player 350 90 "right") Vset0)) #false)
+(check-expect (collision? (make-world (make-player 350 40 "up") Vset0)) #true)
+
+(define (collision? w)
+  (or (in-range? (world-player w) (world-vehicles w))
+      (at-end? (world-player w))))
+
+
+;; in-range?: Player Vset -> Boolean
+;; is player x and y  within range of Vset x and y?
+(check-expect (in-range? player0 Vset0) #false)
+(check-expect (in-range? (make-player 150 450 "right") Vset0) #true)
+(check-expect (in-range? (make-player 350 40 "up") '()) #false)
+
+(define (in-range? c1 c2)
+  (cond[(empty? c2) #false]
+       [else (or (and
+                  (and (<= (- (vehicle-x (first c2)) CAR_WIDTH) (player-x c1))
+                       (>= (+ (vehicle-x (first c2)) CAR_WIDTH) (player-x c1)))
+                  (and (<=  (- (vehicle-y (first c2)) CAR_WIDTH) (player-y c1))
+                       (>= (+ (vehicle-y (first c2)) CAR_WIDTH) (player-y c1))))
+                 (in-range? c1 (rest c2)))]))
+
+
+;; at-end?: Player -> Boolean
+;; to determine whether the player has reached the other side
+(check-expect (at-end? player0) #false)
+(check-expect (at-end? (make-player 400 40 "up")) #true)
+(check-expect (at-end? (make-player 400 100 "left")) #false)
+
+(define (at-end? p)
+  (<= (player-y p) 40))
+
+;;end-message: World -> image
+;;displays win or lose message
+(check-expect (end-message world1) (overlay GAME_OVER (draw-world world1)))
+(check-expect (end-message (make-world (make-player 150 450 "right") Vset0))
+              (overlay GAME_OVER (draw-world (make-world (make-player 150 450 "right") Vset0))))
+(check-expect (end-message (make-world (make-player 400 40 "up") Vset0))
+              (overlay WIN (draw-world (make-world (make-player 400 40 "up") Vset0))))
+
+(define (end-message w)
+  (cond
+    [(at-end? (world-player w))
+     (overlay WIN (draw-world w))]
+    [(in-range? (world-player w) (world-vehicles w))
+     (overlay GAME_OVER (draw-world w))]
+    [else
+     (overlay GAME_OVER (draw-world w))]))
